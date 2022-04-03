@@ -32,32 +32,23 @@ def run(project_id):
         f'{os.environ["LS_HOST"]}/api/projects/{project_id}/')
     tasks_len_ls = project_data['task_number']
     anno_len_ls = project_data['num_tasks_with_annotations']
-    logger.debug(f'Project {project_id} – Tasks: '
-                 f'{tasks_len_ls}; Annotations: {anno_len_ls}')
+    ls_lens = (tasks_len_ls, anno_len_ls)
+    logger.debug(f'Project {project_id}:\n'
+                 f'Tasks: {tasks_len_ls}\nAnnotations: {anno_len_ls}')
 
     db = mongodb_db()
     col = db[f'project_{project_id}']
     tasks_len_mdb = len(list(col.find({}, {})))
     anno_len_mdb = len(list(col.find({"annotations": {'$ne': []}}, {})))
+    mdb_lens = (tasks_len_mdb, anno_len_mdb)
 
-    if tasks_len_ls == tasks_len_mdb:
+    if ls_lens != mdb_lens:
+        _msg = lambda x: f'Difference in {x} number'
         logger.debug(
-            f'The number of tasks in project {project_id} has not changed.')
-    else:
-        logger.debug(
-            f'The number of tasks in project {project_id} has changed! '
-            f'Found {tasks_len_ls - tasks_len_mdb} new tasks.')
+            f'Project {project_id} has changed. Updating...\n'
+            f'{_msg("tasks")}: {tasks_len_ls - tasks_len_mdb}\n'
+            f'{_msg("annotations")}: {anno_len_ls - anno_len_mdb}')
 
-    if anno_len_ls == anno_len_mdb:
-        logger.debug(f'The number of annotations in project {project_id} '
-                     'has not changed.')
-    else:
-        logger.debug(
-            f'The number of annotations in in project {project_id} '
-            f'has changed! Found {anno_len_ls - anno_len_mdb} new annotations.'
-        )
-
-    if anno_len_ls != anno_len_mdb or tasks_len_mdb == 0:
         data = api_request(
             f'{os.environ["LS_HOST"]}/api/projects/{project_id}/export'
             '?exportType=JSON&download_all_tasks=true')
@@ -73,6 +64,9 @@ def run(project_id):
 
         col.drop()
         col.insert_many(data)
+
+    else:
+        logger.debug(f'No changes were detected in project {project_id}...')
 
 
 def main():
