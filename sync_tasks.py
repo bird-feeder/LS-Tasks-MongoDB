@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 
 import requests
@@ -31,7 +32,8 @@ def run(project_id):
         f'{os.environ["LS_HOST"]}/api/projects/{project_id}/')
     tasks_len_ls = project_data['task_number']
     anno_len_ls = project_data['num_tasks_with_annotations']
-    logger.debug(f'Number of tasks in project {project_id}: {tasks_len_ls}')
+    logger.debug(f'Project {project_id} – Tasks: '
+                 f'{tasks_len_ls}; Annotations: {anno_len_ls}')
 
     db = mongodb_db()
     col = db[f'project_{project_id}']
@@ -44,8 +46,7 @@ def run(project_id):
     else:
         logger.debug(
             f'The number of tasks in project {project_id} has changed! '
-            f'Found {tasks_len_ls - tasks_len_mdb} new tasks.'
-        )
+            f'Found {tasks_len_ls - tasks_len_mdb} new tasks.')
 
     if anno_len_ls == anno_len_mdb:
         logger.debug(f'The number of annotations in project {project_id} '
@@ -75,7 +76,8 @@ def run(project_id):
 
 
 def main():
-    for project_id in [1, 10]:
+    projects_id = os.environ['PROJECTS_ID'].split(',')
+    for project_id in projects_id:
         run(project_id)
         logger.info(f'Finished processing project {project_id}')
 
@@ -83,6 +85,10 @@ def main():
 if __name__ == '__main__':
     load_dotenv()
     logger.add('logs.log')
+
+    if '--once' in sys.argv:
+        main()
+        sys.exit(0)
     schedule.every(10).minutes.do(main)
 
     while True:
